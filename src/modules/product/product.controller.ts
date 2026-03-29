@@ -21,7 +21,12 @@ const createProduct = catchAsync(async (req: Request, res: Response) => {
 })
 
 const listProducts = catchAsync(async (req: Request, res: Response) => {
-  const result = await ProductServices.listProducts({ page: req.query.page as any, limit: req.query.limit as any, search: req.query.search as any })
+  const result = await ProductServices.listProducts({ 
+    page: req.query.page as any, 
+    limit: req.query.limit as any, 
+    search: req.query.search as any,
+    categoryId: req.query.category as any
+  })
   res.status(StatusCodes.OK).json({ success: true, data: result.data, meta: result.meta })
 })
 
@@ -40,4 +45,18 @@ const restockProduct = catchAsync(async (req: Request, res: Response) => {
   res.status(StatusCodes.OK).json({ success: true, message: 'Product restocked', data: updated })
 })
 
-export const ProductController = { createCategory, createProduct, listProducts, getProduct, updateProduct, restockProduct, listCategories }
+const deleteProduct = catchAsync(async (req: Request, res: Response) => {
+  await ProductServices.deleteProduct(req.params.id)
+  res.status(StatusCodes.OK).json({ success: true, message: 'Product deleted' })
+})
+
+export const ProductController = { 
+  createCategory, 
+  createProduct, 
+  listProducts, 
+  getProduct, 
+  updateProduct, 
+  restockProduct, 
+  listCategories, 
+  deleteProduct 
+}

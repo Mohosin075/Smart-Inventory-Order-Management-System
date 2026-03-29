@@ -11,5 +11,6 @@ router.get('/', ProductController.listProducts);
 router.get('/:id', ProductController.getProduct);
 router.patch('/:id', ProductController.updateProduct);
 router.patch('/:id/restock', ProductController.restockProduct);
+router.delete('/:id', ProductController.deleteProduct);
 
 export const ProductRoutes = router;

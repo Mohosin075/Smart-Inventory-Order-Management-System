@@ -50,11 +50,12 @@ const createProduct = async (payload: any) => {
 }
 
 
-const listProducts = async (opts: { page?: number; limit?: number; search?: string }) => {
+const listProducts = async (opts: { page?: number; limit?: number; search?: string; categoryId?: string }) => {
   const page = Math.max(Number(opts.page || 1), 1)
   const limit = Math.max(Number(opts.limit || 20), 1)
   const filter: any = {}
   if (opts.search) filter.$or = [{ name: { $regex: opts.search, $options: 'i' } }]
+  if (opts.categoryId) filter.category = opts.categoryId
   const total = await Product.countDocuments(filter)
   const data = await Product.find(filter).populate('category').skip((page - 1) * limit).limit(limit).sort({ createdAt: -1 })
 
@@ -102,5 +103,14 @@ const restockProduct = async (id: string, quantity: number) => {
   return updated
 }
 
-export const ProductServices = { createCategory, createProduct, listProducts, getProduct, updateProduct, restockProduct, listCategories }
+const deleteProduct = async (id: string) => {
+  const deleted = await Product.findByIdAndDelete(id)
+  if (!deleted) throw { status: StatusCodes.NOT_FOUND, message: 'Product not found' }
+  // delete related restock entries
+  const { Restock } = await import('../restock/restock.model')
+  await Restock.deleteMany({ product: id })
+  return deleted
+}
+
+export const ProductServices = { createCategory, createProduct, listProducts, getProduct, updateProduct, restockProduct, listCategories, deleteProduct }
 
