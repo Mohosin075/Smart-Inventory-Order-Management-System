@@ -17,11 +17,12 @@ const getInsights = catchAsync(async (req: Request, res: Response) => {
   const revenueOrders = await Order.find({ createdAt: { $gte: startOfDay, $lte: endOfDay } }).select('totalPrice')
   const revenueToday = revenueOrders.reduce((sum: number, o: any) => sum + (o.totalPrice || 0), 0)
 
-  const lowStockProducts = await Product.find({ $expr: { $lt: ['$stockQuantity', '$minStockThreshold'] } })
+  const topProducts = await Product.find()
+    .sort({ createdAt: -1 })
     .limit(5)
     .select('name stockQuantity minStockThreshold')
 
-  const productSummary = lowStockProducts.map(p => ({
+  const productSummary = topProducts.map(p => ({
     name: p.name,
     stock: p.stockQuantity,
     threshold: p.minStockThreshold
