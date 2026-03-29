@@ -1,0 +1,11 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.RestockRoutes = void 0;
+const express_1 = require("express");
+const restock_controller_1 = require("./restock.controller");
+const router = (0, express_1.Router)();
+router.post('/add', restock_controller_1.RestockController.addToRestockQueue);
+router.get('/', restock_controller_1.RestockController.listQueue);
+router.patch('/:id/restock', restock_controller_1.RestockController.restockFromQueue);
+router.delete('/:id', restock_controller_1.RestockController.removeFromQueue);
+exports.RestockRoutes = router;

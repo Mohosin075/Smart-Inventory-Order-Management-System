@@ -7,7 +7,7 @@ export interface IRestock {
 
 const RestockSchema = new Schema<IRestock>(
   {
-    product: { type: Types.ObjectId, ref: 'Product', required: true },
+    product: { type: Schema.Types.ObjectId, ref: 'Product', required: true },
     priority: { type: String, enum: ['High', 'Medium', 'Low'], required: true },
   },
   { timestamps: true },
