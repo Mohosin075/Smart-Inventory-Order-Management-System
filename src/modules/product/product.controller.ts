@@ -14,6 +14,19 @@ const listCategories = catchAsync(async (req: Request, res: Response) => {
   res.status(StatusCodes.OK).json({ success: true, data: categories })
 })
 
+const updateCategory = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params
+  const { name } = req.body
+  const updated = await ProductServices.updateCategory(id, name)
+  res.status(StatusCodes.OK).json({ success: true, message: 'Category updated successfully', category: updated })
+})
+
+const deleteCategory = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params
+  await ProductServices.deleteCategory(id)
+  res.status(StatusCodes.OK).json({ success: true, message: 'Category deleted successfully' })
+})
+
 
 const createProduct = catchAsync(async (req: Request, res: Response) => {
   const product = await ProductServices.createProduct(req.body)
@@ -58,5 +71,7 @@ export const ProductController = {
   updateProduct, 
   restockProduct, 
   listCategories, 
-  deleteProduct 
+  deleteProduct,
+  updateCategory,
+  deleteCategory
 }

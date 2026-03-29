@@ -5,6 +5,8 @@ const router = Router();
 
 router.get('/categories', ProductController.listCategories);
 router.post('/categories', ProductController.createCategory);
+router.patch('/categories/:id', ProductController.updateCategory);
+router.delete('/categories/:id', ProductController.deleteCategory);
 
 router.post('/products', ProductController.createProduct);
 router.get('/', ProductController.listProducts);

@@ -14,6 +14,24 @@ const listCategories = async () => {
   return Category.find().sort({ name: 1 })
 }
 
+const updateCategory = async (id: string, name: string) => {
+  if (!name) throw { status: StatusCodes.BAD_REQUEST, message: 'Category name is required' }
+  const existing = await Category.findOne({ name: { $regex: new RegExp(`^${name}$`, 'i') }, _id: { $ne: id } })
+  if (existing) throw { status: StatusCodes.CONFLICT, message: 'Category already exists' }
+  const updated = await Category.findByIdAndUpdate(id, { name }, { new: true })
+  if (!updated) throw { status: StatusCodes.NOT_FOUND, message: 'Category not found' }
+  return updated
+}
+
+const deleteCategory = async (id: string) => {
+  const category = await Category.findById(id)
+  if (!category) throw { status: StatusCodes.NOT_FOUND, message: 'Category not found' }
+  // nullify categories in linked products
+  await Product.updateMany({ category: id }, { $unset: { category: 1 } })
+  await Category.findByIdAndDelete(id)
+  return { success: true }
+}
+
 
 const createProduct = async (payload: any) => {
   const { 
@@ -112,5 +130,16 @@ const deleteProduct = async (id: string) => {
   return deleted
 }
 
-export const ProductServices = { createCategory, createProduct, listProducts, getProduct, updateProduct, restockProduct, listCategories, deleteProduct }
+export const ProductServices = { 
+  createCategory, 
+  createProduct, 
+  listProducts, 
+  getProduct, 
+  updateProduct, 
+  restockProduct, 
+  listCategories, 
+  deleteProduct,
+  updateCategory,
+  deleteCategory
+}
 
