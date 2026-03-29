@@ -40,22 +40,56 @@ const product_model_1 = require("./product.model");
 const createCategory = async (name) => {
     if (!name)
         throw { status: http_status_codes_1.StatusCodes.BAD_REQUEST, message: 'Category name is required' };
-    const existing = await category_model_1.Category.findOne({ name });
+    // case-insensitive check
+    const existing = await category_model_1.Category.findOne({ name: { $regex: new RegExp(`^${name}$`, 'i') } });
     if (existing)
         throw { status: http_status_codes_1.StatusCodes.CONFLICT, message: 'Category already exists' };
     return category_model_1.Category.create({ name });
 };
+const listCategories = async () => {
+    return category_model_1.Category.find().sort({ name: 1 });
+};
+const updateCategory = async (id, name) => {
+    if (!name)
+        throw { status: http_status_codes_1.StatusCodes.BAD_REQUEST, message: 'Category name is required' };
+    const existing = await category_model_1.Category.findOne({ name: { $regex: new RegExp(`^${name}$`, 'i') }, _id: { $ne: id } });
+    if (existing)
+        throw { status: http_status_codes_1.StatusCodes.CONFLICT, message: 'Category already exists' };
+    const updated = await category_model_1.Category.findByIdAndUpdate(id, { name }, { new: true });
+    if (!updated)
+        throw { status: http_status_codes_1.StatusCodes.NOT_FOUND, message: 'Category not found' };
+    return updated;
+};
+const deleteCategory = async (id) => {
+    const category = await category_model_1.Category.findById(id);
+    if (!category)
+        throw { status: http_status_codes_1.StatusCodes.NOT_FOUND, message: 'Category not found' };
+    // nullify categories in linked products
+    await product_model_1.Product.updateMany({ category: id }, { $unset: { category: 1 } });
+    await category_model_1.Category.findByIdAndDelete(id);
+    return { success: true };
+};
 const createProduct = async (payload) => {
-    const { name, category: categoryId, price = 0, stockQuantity = 0, minStockThreshold = 5 } = payload;
+    const { name, category, categoryId, price = 0, stock, stockQuantity, threshold, minStockThreshold } = payload;
     if (!name)
         throw { status: http_status_codes_1.StatusCodes.BAD_REQUEST, message: 'Product name is required' };
-    let category = undefined;
-    if (categoryId) {
-        category = await category_model_1.Category.findById(categoryId);
-        if (!category)
+    const targetCategoryId = categoryId || category;
+    const targetStock = stockQuantity !== undefined ? stockQuantity : (stock !== undefined ? Number(stock) : 0);
+    const targetThreshold = minStockThreshold !== undefined ? minStockThreshold : (threshold !== undefined ? Number(threshold) : 5);
+    let foundCategory = undefined;
+    if (targetCategoryId) {
+        foundCategory = await category_model_1.Category.findById(targetCategoryId);
+        if (!foundCategory)
             throw { status: http_status_codes_1.StatusCodes.BAD_REQUEST, message: 'Invalid category id' };
     }
-    return product_model_1.Product.create({ name, category: category ? category._id : undefined, price, stockQuantity, minStockThreshold, status: stockQuantity > 0 ? 'Active' : 'Out of Stock' });
+    return product_model_1.Product.create({
+        name,
+        category: foundCategory ? foundCategory._id : undefined,
+        price: Number(price),
+        stockQuantity: targetStock,
+        minStockThreshold: targetThreshold,
+        status: targetStock > 0 ? 'Active' : 'Out of Stock'
+    });
 };
 const listProducts = async (opts) => {
     const page = Math.max(Number(opts.page || 1), 1);
@@ -63,18 +97,33 @@ const listProducts = async (opts) => {
     const filter = {};
     if (opts.search)
         filter.$or = [{ name: { $regex: opts.search, $options: 'i' } }];
+    if (opts.categoryId)
+        filter.category = opts.categoryId;
     const total = await product_model_1.Product.countDocuments(filter);
-    const data = await product_model_1.Product.find(filter).skip((page - 1) * limit).limit(limit).sort({ createdAt: -1 });
+    const data = await product_model_1.Product.find(filter).populate('category').skip((page - 1) * limit).limit(limit).sort({ createdAt: -1 });
     return { data, meta: { page, limit, total } };
 };
 const getProduct = async (id) => {
-    const product = await product_model_1.Product.findById(id);
+    const product = await product_model_1.Product.findById(id).populate('category');
     if (!product)
         throw { status: http_status_codes_1.StatusCodes.NOT_FOUND, message: 'Product not found' };
     return product;
 };
 const updateProduct = async (id, payload) => {
-    const updated = await product_model_1.Product.findByIdAndUpdate(id, { $set: payload }, { new: true });
+    const { stock, stockQuantity, threshold, minStockThreshold, ...rest } = payload;
+    const updateData = { ...rest };
+    if (stockQuantity !== undefined)
+        updateData.stockQuantity = Number(stockQuantity);
+    else if (stock !== undefined)
+        updateData.stockQuantity = Number(stock);
+    if (minStockThreshold !== undefined)
+        updateData.minStockThreshold = Number(minStockThreshold);
+    else if (threshold !== undefined)
+        updateData.minStockThreshold = Number(threshold);
+    if (updateData.stockQuantity !== undefined) {
+        updateData.status = updateData.stockQuantity > 0 ? 'Active' : 'Out of Stock';
+    }
+    const updated = await product_model_1.Product.findByIdAndUpdate(id, { $set: updateData }, { new: true });
     if (!updated)
         throw { status: http_status_codes_1.StatusCodes.NOT_FOUND, message: 'Product not found' };
     return updated;
@@ -93,4 +142,24 @@ const restockProduct = async (id, quantity) => {
     await Activity.create({ action: `Product ${updated.name} restocked by ${q}`, metadata: { productId: updated._id, quantity: q } });
     return updated;
 };
-exports.ProductServices = { createCategory, createProduct, listProducts, getProduct, updateProduct, restockProduct };
+const deleteProduct = async (id) => {
+    const deleted = await product_model_1.Product.findByIdAndDelete(id);
+    if (!deleted)
+        throw { status: http_status_codes_1.StatusCodes.NOT_FOUND, message: 'Product not found' };
+    // delete related restock entries
+    const { Restock } = await Promise.resolve().then(() => __importStar(require('../restock/restock.model')));
+    await Restock.deleteMany({ product: id });
+    return deleted;
+};
+exports.ProductServices = {
+    createCategory,
+    createProduct,
+    listProducts,
+    getProduct,
+    updateProduct,
+    restockProduct,
+    listCategories,
+    deleteProduct,
+    updateCategory,
+    deleteCategory
+};

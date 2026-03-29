@@ -16,15 +16,25 @@ const getInsights = (0, catchAsync_1.default)(async (req, res) => {
     const totalOrdersToday = await order_model_1.Order.countDocuments({ createdAt: { $gte: startOfDay, $lte: endOfDay } });
     const pendingOrders = await order_model_1.Order.countDocuments({ status: 'Pending' });
     const completedOrders = await order_model_1.Order.countDocuments({ status: { $in: ['Delivered', 'Shipped', 'Confirmed'] } });
-    const lowStockItems = await product_model_1.Product.countDocuments({ $expr: { $lt: ['$stockQuantity', '$minStockThreshold'] } });
+    const lowStockItemsCount = await product_model_1.Product.countDocuments({ $expr: { $lt: ['$stockQuantity', '$minStockThreshold'] } });
     const revenueOrders = await order_model_1.Order.find({ createdAt: { $gte: startOfDay, $lte: endOfDay } }).select('totalPrice');
     const revenueToday = revenueOrders.reduce((sum, o) => sum + (o.totalPrice || 0), 0);
+    const topProducts = await product_model_1.Product.find()
+        .sort({ createdAt: -1 })
+        .limit(5)
+        .select('name stockQuantity minStockThreshold');
+    const productSummary = topProducts.map(p => ({
+        name: p.name,
+        stock: p.stockQuantity,
+        threshold: p.minStockThreshold
+    }));
     const insights = {
         totalOrdersToday,
         pendingOrders,
         completedOrders,
-        lowStockItems,
+        lowStockItemsCount,
         revenueToday,
+        productSummary
     };
     res.status(http_status_codes_1.StatusCodes.OK).json({ success: true, message: 'Dashboard insights fetched successfully', insights });
 });

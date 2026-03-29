@@ -65,6 +65,8 @@ const listOrders = async (opts) => {
     const filter = {};
     if (opts.status)
         filter.status = opts.status;
+    if (opts.search)
+        filter.customerName = { $regex: opts.search, $options: 'i' };
     if (opts.from || opts.to) {
         filter.createdAt = {};
         if (opts.from)
