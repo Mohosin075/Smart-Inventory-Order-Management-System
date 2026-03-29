@@ -58,6 +58,7 @@ const listOrders = async (opts: any) => {
   const l = Math.max(Number(opts.limit || 20), 1)
   const filter: any = {}
   if (opts.status) filter.status = opts.status
+  if (opts.search) filter.customerName = { $regex: opts.search, $options: 'i' }
   if (opts.from || opts.to) { filter.createdAt = {}; if (opts.from) filter.createdAt.$gte = new Date(opts.from); if (opts.to) filter.createdAt.$lte = new Date(opts.to) }
   const total = await Order.countDocuments(filter)
   const data = await Order.find(filter).skip((p - 1) * l).limit(l).sort({ createdAt: -1 })

@@ -13,16 +13,27 @@ const getInsights = catchAsync(async (req: Request, res: Response) => {
   const totalOrdersToday = await Order.countDocuments({ createdAt: { $gte: startOfDay, $lte: endOfDay } })
   const pendingOrders = await Order.countDocuments({ status: 'Pending' })
   const completedOrders = await Order.countDocuments({ status: { $in: ['Delivered', 'Shipped', 'Confirmed'] } })
-  const lowStockItems = await Product.countDocuments({ $expr: { $lt: ['$stockQuantity', '$minStockThreshold'] } })
+  const lowStockItemsCount = await Product.countDocuments({ $expr: { $lt: ['$stockQuantity', '$minStockThreshold'] } })
   const revenueOrders = await Order.find({ createdAt: { $gte: startOfDay, $lte: endOfDay } }).select('totalPrice')
   const revenueToday = revenueOrders.reduce((sum: number, o: any) => sum + (o.totalPrice || 0), 0)
+
+  const lowStockProducts = await Product.find({ $expr: { $lt: ['$stockQuantity', '$minStockThreshold'] } })
+    .limit(5)
+    .select('name stockQuantity minStockThreshold')
+
+  const productSummary = lowStockProducts.map(p => ({
+    name: p.name,
+    stock: p.stockQuantity,
+    threshold: p.minStockThreshold
+  }))
 
   const insights = {
     totalOrdersToday,
     pendingOrders,
     completedOrders,
-    lowStockItems,
+    lowStockItemsCount,
     revenueToday,
+    productSummary
   }
 
   res.status(StatusCodes.OK).json({ success: true, message: 'Dashboard insights fetched successfully', insights })
